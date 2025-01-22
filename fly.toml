@@ -1,20 +1,19 @@
-# fly.toml app configuration file generated for job-repository-pocketbase on 2024-12-27T13:31:25+08:00
-#
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
+app = "go-extract"
+primary_region = "sin"
 
-app = 'go-extract'
-primary_region = 'sin'
+[build.args]
+GO_VERSION = "1.23.5"
 
-[build]
+[env]
+PORT = "8989"
 
 [http_service]
-  internal_port = 8989
-  force_https = true
-  auto_stop_machines = 'stop'
-  auto_start_machines = true
-  min_machines_running = 0
-  processes = ['app']
+auto_start_machines = true
+auto_stop_machines = true
+force_https = true
+internal_port = 8989
+min_machines_running = 0
+processes = [ "app" ]
 
 [[vm]]
   size = 'shared-cpu-1x'
