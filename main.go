@@ -2,14 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"encoding/xml"
 	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
-	"strings"
+	"regexp"
 
-	"github.com/gomutex/godocx"
+	"github.com/nguyenthenguyen/docx"
 )
 
 const (
@@ -62,35 +61,39 @@ func handleExtract(w http.ResponseWriter, r *http.Request) {
 
 	// Copy uploaded file to temp file
 	fileBytes := make([]byte, header.Size)
-	if _, err := file.Read(fileBytes); err != nil {
+	if _, err = file.Read(fileBytes); err != nil {
 		http.Error(w, "Error reading file", http.StatusInternalServerError)
 		return
 	}
-	if _, err := tempFile.Write(fileBytes); err != nil {
+	if _, err = tempFile.Write(fileBytes); err != nil {
 		http.Error(w, "Error processing file", http.StatusInternalServerError)
 		return
 	}
 
-	// Extract content using godocx
-	doc, err := godocx.OpenDocument(tempFile.Name())
+	// Read docx file
+	docxFile, err := docx.ReadDocxFile(tempFile.Name())
 	if err != nil {
-		http.Error(w, "Error opening document: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Error reading document: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	defer docxFile.Close()
 
-	// Get content by marshaling the document body
-	var content strings.Builder
-	xmlEncoder := xml.NewEncoder(&content)
-	err = doc.Document.Body.MarshalXML(xmlEncoder, xml.StartElement{})
-	if err != nil {
-		http.Error(w, "Error extracting content: "+err.Error(), http.StatusInternalServerError)
-		return
+	// Get editable document
+	doc := docxFile.Editable()
+	xmlContent := doc.GetContent()
+
+	// Extract text between <w:t> tags
+	var content string
+	for _, match := range regexp.MustCompile(`<w:t[^>]*>([^<]+)</w:t>`).FindAllStringSubmatch(xmlContent, -1) {
+		if len(match) > 1 {
+			content += match[1] + " "
+		}
 	}
 
 	// Prepare response
 	w.Header().Set("Content-Type", "application/json")
 	response := Response{
-		Content: content.String(),
+		Content: content,
 	}
 
 	// Send JSON response
